@@ -76,12 +76,45 @@ defmodule PlugRailsCookieSessionStore.MessageEncryptor do
     {:ok, result}
   end
 
+  # OTP 24 removed retired cipher names
+  # http://erlang.org/doc/apps/crypto/new_api.html#retired-cipher-names
+  defp map_algorithm(:aes_cbc256, _key), do: :aes_256_cbc
+
+  defp map_algorithm(:aes_gcm, key) do
+    case bit_size(key) do
+      128 -> :aes_128_gcm
+      192 -> :aes_192_gcm
+      256 -> :aes_256_gcm
+    end
+  end
+
+  # :crypto.block_encrypt and :crypto.block_decrypt were removed in OTP 24
+  defp block_encrypt(algorithm, key, initialization_vector, {aad, plain_text}) do
+    map_algorithm(algorithm, key)
+    |> :crypto.crypto_one_time_aead(key, initialization_vector, plain_text, aad, true)
+  end
+
+  defp block_encrypt(algorithm, key, initialization_vector, plain_text) do
+    map_algorithm(algorithm, key)
+    |> :crypto.crypto_one_time(key, initialization_vector, plain_text, true)
+  end
+
+  defp block_decrypt(algorithm, key, initialization_vector, {aad, data, tag}) do
+    map_algorithm(algorithm, key)
+    |> :crypto.crypto_one_time_aead(key, initialization_vector, data, aad, tag, false)
+  end
+
+  defp block_decrypt(algorithm, key, initialization_vector, data) do
+    map_algorithm(algorithm, key)
+    |> :crypto.crypto_one_time(key, initialization_vector, data, false)
+  end
+
   defp encrypt(message, cipher, secret, iv) do
-    :crypto.block_encrypt(cipher, trim_secret(secret), iv, message)
+    block_encrypt(cipher, trim_secret(secret), iv, message)
   end
 
   defp decrypt(encrypted, cipher, secret, iv) do
-    :crypto.block_decrypt(cipher, trim_secret(secret), iv, encrypted)
+    block_decrypt(cipher, trim_secret(secret), iv, encrypted)
   end
 
   defp pad_message(msg) do
