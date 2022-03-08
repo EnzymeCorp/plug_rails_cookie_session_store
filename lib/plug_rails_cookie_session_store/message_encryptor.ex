@@ -89,11 +89,6 @@ defmodule PlugRailsCookieSessionStore.MessageEncryptor do
   end
 
   # :crypto.block_encrypt and :crypto.block_decrypt were removed in OTP 24
-  defp block_encrypt(algorithm, key, initialization_vector, {aad, plain_text}) do
-    map_algorithm(algorithm, key)
-    |> :crypto.crypto_one_time_aead(key, initialization_vector, plain_text, aad, true)
-  end
-
   defp block_encrypt(algorithm, key, initialization_vector, plain_text) do
     map_algorithm(algorithm, key)
     |> :crypto.crypto_one_time(key, initialization_vector, plain_text, true)
